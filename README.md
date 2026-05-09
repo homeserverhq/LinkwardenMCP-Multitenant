@@ -38,16 +38,15 @@ docker build -t linkwarden-mcp .
 docker run -p 80:80 -e LINKWARDEN_BASE_URL=http://your-linkwarden-url:3000 linkwarden-mcp
 ```
 
-## TOON-Optimized
+## 🚀 TOON Optimization
 
-This MCP server leverages **TOON (Token-Optimized Object Notation)** to optimize data transmission between the Linkwarden API and AI models:
+This server uses **TOON (Token-Optimized Object Notation)** to shrink data payloads. By converting verbose JSON into a compact format, we reduce token usage by **30-60%**, allowing agents to process more data within their context window for less cost.
 
-*   **Compact Data Format**: Converts verbose JSON responses into a streamlined TOON format, reducing token usage by approximately 30-60%
-*   **Cost Efficiency**: Lower token consumption translates to reduced operational costs when using token-based LLM pricing
-*   **Enhanced Context Management**: More data can fit within the AI's limited context window, enabling richer responses
-*   **Faster Processing**: Smaller payloads lead to quicker inference times and improved workflow efficiency
-*   **Seamless Integration**: The TOON optimization is applied automatically across multiple tool responses, requiring no changes to agent configurations
-*   **Bidirectional Support**: The server can encode data to TOON for AI consumption and decode it back to standard JSON when needed for storage or further processing
+**Optimized Endpoints:**
+- **Collections**: `get_all_collections`
+- **Links**: `get_all_links`
+- **Public Collections**: `get_public_collections_links`, `get_public_collections_tags`
+- **Tags & Search**: `get_all_tags`, `search_links`
 
 ## API Tool Mapping
 
