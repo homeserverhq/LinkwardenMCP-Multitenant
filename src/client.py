@@ -1,7 +1,6 @@
 import os
 import httpx
 from typing import Any, Optional, List, Dict
-from toon_mcp import json_to_toon
 
 class LinkwardenServiceClient:
     """Client for Linkwarden API with authentication passthrough."""
@@ -68,8 +67,7 @@ class LinkwardenServiceClient:
 
     # --- Collection Management ---
     async def get_all_collections(self, api_key: Optional[str] = None) -> Any:
-        raw_data = await self.get("/api/v1/collections", api_key)
-        return json_to_toon(raw_data)
+        return await self.get("/api/v1/collections", api_key)
 
     async def get_collection_by_id(self, collectionId: int, api_key: Optional[str] = None) -> Any:
         return await self.get(f"/api/v1/collections/{collectionId}", api_key)
@@ -101,13 +99,11 @@ class LinkwardenServiceClient:
             "sort": sort,
             "cursor": cursor,
         }
-        raw_data = await self.get("/api/v1/public/collections/links", api_key, params=params)
-        return json_to_toon(raw_data)
+        return await self.get("/api/v1/public/collections/links", api_key, params=params)
 
     async def get_public_collections_tags(self, collectionId: int, search: Optional[str] = None, api_key: Optional[str] = None) -> Any:
         params = {"collectionId": collectionId, "search": search}
-        raw_data = await self.get("/api/v1/public/collections/tags", api_key, params=params)
-        return json_to_toon(raw_data)
+        return await self.get("/api/v1/public/collections/tags", api_key, params=params)
 
     # --- Link Management ---
     async def get_all_links(self, collectionId: Optional[int] = None, tagId: Optional[int] = None, searchQueryString: Optional[str] = None, pinnedOnly: Optional[bool] = None, sort: Optional[int] = None, cursor: Optional[int] = None, search_by_name: bool = False, search_by_url: bool = False, search_by_description: bool = False, search_by_text: bool = False, search_by_tags: bool = False, api_key: Optional[str] = None) -> Any:
@@ -119,32 +115,19 @@ class LinkwardenServiceClient:
             "sort": sort,
             "cursor": cursor,
         }
-        raw_data = await self.get("/api/v1/links", api_key, params=params)
-        if isinstance(raw_data, list):
-            for link in raw_data:
-                if isinstance(link, dict):
-                    link.pop("textContent", None)
-        elif isinstance(raw_data, dict) and "links" in raw_data and isinstance(raw_data["links"], list):
-            for link in raw_data["links"]:
-                if isinstance(link, dict):
-                    link.pop("textContent", None)
-        return json_to_toon(raw_data)
+        return await self.get("/api/v1/links", api_key, params=params)
 
     async def get_link_by_id(self, link_id: int, api_key: Optional[str] = None) -> Any:
         return await self.get(f"/api/v1/links/{link_id}", api_key)
 
     async def create_link(self, url: str, name: str, description: str, collectionId: int, tags: List[str], api_key: Optional[str] = None) -> Any:
-        # First, fetch the collection to get its name to satisfy the backend schema
-        collection = await self.get_collection_by_id(collectionId, api_key)
-        collection_name = collection.get("name", "Unknown Collection")
         payload = {
             "url": url,
             "name": name,
             "description": description,
             "type": "url",
             "collection": {
-                "id": collectionId,
-                "name": collection_name
+                "id": collectionId
             },
             "tags": [{"name": tag} for tag in tags]
         }
@@ -161,11 +144,13 @@ class LinkwardenServiceClient:
 
     # --- Tag Management ---
     async def get_all_tags(self, api_key: Optional[str] = None) -> Any:
-        raw_data = await self.get("/api/v1/tags", api_key)
-        return json_to_toon(raw_data)
+        return await self.get("/api/v1/tags", api_key)
 
     async def delete_tag_by_id(self, tagId: int, api_key: Optional[str] = None) -> Any:
         return await self.delete(f"/api/v1/tags/{tagId}", api_key)
+
+    async def update_link_by_id(self, link_id: int, link_data: dict, api_key: Optional[str] = None) -> Any:
+        return await self.put(f"/api/v1/links/{link_id}", api_key, json_data=link_data)
 
     # --- Utilities ---
     async def search_links(self, searchQueryString: str, collectionId: Optional[int] = None, tagId: Optional[int] = None, sort: Optional[int] = None, cursor: Optional[int] = None, api_key: Optional[str] = None) -> Any:
@@ -176,8 +161,4 @@ class LinkwardenServiceClient:
             "sort": sort,
             "cursor": cursor
         }
-        raw_data = await self.get("/api/v1/search", api_key, params=params)
-        return json_to_toon(raw_data)
-
-    async def get_user_info(self, api_key: Optional[str] = None) -> Any:
-        return await self.get("/api/v1/users/me", api_key)
+        return await self.get("/api/v1/search", api_key, params=params)

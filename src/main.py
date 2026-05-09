@@ -4,6 +4,7 @@ from contextvars import ContextVar
 from fastmcp import FastMCP, Context
 from pydantic import BaseModel, Field
 from .client import LinkwardenServiceClient
+from toon_mcp import json_to_toon
 
 # Context variable to store the current user's token
 _current_user_token: ContextVar[Optional[str]] = ContextVar("current_user_token", default=None)
@@ -88,6 +89,10 @@ class GetPublicTagsParam(BaseModel):
     collectionId: int = Field(description="The ID of the public collection")
     search: Optional[str] = Field(default=None, description="Search term for tags")
 
+class EditTagByLinkIdParam(BaseModel):
+    id: int = Field(description="The unique ID of the link")
+    name: str = Field(description="The name of the tag to append/remove")
+
 # =============================================================================
 # Collection Tools
 # =============================================================================
@@ -95,7 +100,8 @@ class GetPublicTagsParam(BaseModel):
 @mcp.tool()
 async def get_all_collections(ctx: Context) -> dict[str, Any]:
     """List all available collections."""
-    collections = await get_client().get_all_collections(get_user_token())
+    raw_data = await get_client().get_all_collections(get_user_token())
+    collections = json_to_toon(raw_data)
     return {"collections": collections}
 
 @mcp.tool()
@@ -123,15 +129,17 @@ async def get_public_collection_by_id(params: GetCollectionByIdParam, ctx: Conte
 @mcp.tool()
 async def get_public_collections_links(params: GetPublicLinksParam, ctx: Context) -> dict[str, Any]:
     """Advanced filtering for public collection links."""
-    collections_links = await get_client().get_public_collections_links(
+    raw_data = await get_client().get_public_collections_links(
         params.collectionId, params.searchQueryString, params.pinnedOnly, params.sort, params.cursor, api_key=get_user_token()
     )
+    collections_links = json_to_toon(raw_data)
     return {"collections_links": collections_links}
 
 @mcp.tool()
 async def get_public_collections_tags(params: GetPublicTagsParam, ctx: Context) -> dict[str, Any]:
     """Get tags used in a public collection."""
-    collections_tags = await get_client().get_public_collections_tags(params.collectionId, params.search)
+    raw_data = await get_client().get_public_collections_tags(params.collectionId, params.search)
+    collections_tags = json_to_toon(raw_data)
     return {"collections_tags": collections_tags}
 
 # =============================================================================
@@ -150,9 +158,18 @@ async def get_all_links(
     ctx: Context = None
 ) -> dict[str, Any]:
     """Primary browsing tool with deep filtering."""
-    links = await get_client().get_all_links(
+    raw_data = await get_client().get_all_links(
         collectionId, tagId, searchQueryString, pinnedOnly, sort, cursor, api_key=get_user_token()
     )
+    if isinstance(raw_data, list):
+        for link in raw_data:
+            if isinstance(link, dict):
+                link.pop("textContent", None)
+    elif isinstance(raw_data, dict) and "links" in raw_data and isinstance(raw_data["links"], list):
+        for link in raw_data["links"]:
+            if isinstance(link, dict):
+                link.pop("textContent", None)
+    links = json_to_toon(raw_data)
     return {"links": links}
 
 @mcp.tool()
@@ -190,13 +207,50 @@ async def archive_link(params: GetLinkByIdParam, ctx: Context) -> dict[str, Any]
 @mcp.tool()
 async def get_all_tags(ctx: Context) -> dict[str, Any]:
     """List all system tags."""
-    all_tags = await get_client().get_all_tags(get_user_token())
+    raw_data = await get_client().get_all_tags(get_user_token())
+    all_tags = json_to_toon(raw_data)
     return {"all_tags": all_tags}
 
 @mcp.tool()
 async def delete_tag_by_id(params: GetCollectionByIdParam, ctx: Context) -> dict[str, Any]:
     """Remove a tag."""
     return await get_client().delete_tag_by_id(params.id, get_user_token())
+
+@mcp.tool()
+async def append_tag_by_link_id(params: EditTagByLinkIdParam, ctx: Context) -> dict[str, Any]:
+    """Appends a tag to an existing link."""
+    current_link = await get_client().get_link_by_id(params.id, get_user_token())
+    if not current_link or "id" not in current_link:
+        return {"message": f"Link does not exist.", "success": False}
+    existing_tags = [{"name": t["name"]} for t in (current_link.get("tags") or [])]
+    if any(t["name"] == params.name for t in existing_tags):
+        return {"message": f"Tag '{params.name}' already exists on this link.", "success": True}
+    existing_tags.append({"name": params.name})
+    current_link["tags"] = existing_tags
+    return await get_client().update_link_by_id(params.id, current_link, get_user_token())
+
+@mcp.tool()
+async def remove_tag_by_link_id(params: EditTagByLinkIdParam, ctx: Context) -> dict[str, Any]:
+    """Removes a single tag by name from an existing link."""
+    current_link = await get_client().get_link_by_id(params.id, get_user_token())
+    if not current_link or "id" not in current_link:
+        return {"message": f"Link does not exist.", "success": False}
+    existing_tags = current_link.get("tags") or []
+    tag_to_remove = next((tag for tag in existing_tags if tag.get("name") == params.name), None)
+    if not tag_to_remove:
+        return {"message": f"Tag '{params.name}' was not present on this link.", "success": True}
+    updated_tags = [tag for tag in existing_tags if tag.get("name") != params.name]
+    current_link["tags"] = updated_tags
+    return await get_client().update_link_by_id(params.id, current_link, get_user_token())
+
+@mcp.tool()
+async def clear_tags_by_link_id(params: GetLinkByIdParam, ctx: Context) -> dict[str, Any]:
+    """Clears all tags from an existing link without deleting the tags from the system."""
+    current_link = await get_client().get_link_by_id(params.id, get_user_token())
+    if not current_link or "id" not in current_link:
+        return {"message": f"Link does not exist.", "success": False}
+    current_link["tags"] = []
+    return await get_client().update_link_by_id(params.id, current_link, get_user_token())
 
 # =============================================================================
 # Utility Tools
@@ -205,9 +259,10 @@ async def delete_tag_by_id(params: GetCollectionByIdParam, ctx: Context) -> dict
 @mcp.tool()
 async def search_links(params: SearchLinksParam, ctx: Context) -> dict[str, Any]:
     """High-level keyword search across the library."""
-    search_results = await get_client().search_links(
+    raw_data = await get_client().search_links(
         params.searchQueryString, params.collectionId, params.tagId, params.sort, params.cursor, get_user_token()
     )
+    search_results = json_to_toon(raw_data)
     return {"search_results": search_results}
 
 @mcp.tool()
@@ -221,11 +276,6 @@ async def get_server_status(ctx: Context) -> dict[str, Any]:
             return {"status": "connected", "backend_response": response.status_code}
     except Exception as e:
         return {"status": "disconnected", "error": str(e)}
-
-@mcp.tool()
-async def get_user_info(ctx: Context) -> dict[str, Any]:
-    """Returns info about the authenticated user."""
-    return await get_client().get_user_info(get_user_token())
 
 # =============================================================================
 # Entry Point
