@@ -28,7 +28,6 @@ This repository contains a Model Context Protocol (MCP) server that acts as a se
    export LINKWARDEN_BASE_URL=http://your-linkwarden-url:3000
    python -m src.main
    ```
-
 ## Docker Deployment
 
 Build and run the server using Docker:
@@ -37,7 +36,6 @@ Build and run the server using Docker:
 docker build -t linkwarden-mcp .
 docker run -p 80:80 -e LINKWARDEN_BASE_URL=http://your-linkwarden-url:3000 linkwarden-mcp
 ```
-
 ## 🚀 TOON Optimization
 
 This server uses **TOON (Token-Optimized Object Notation)** to shrink data payloads. By converting verbose JSON into a compact format, we reduce token usage by **30-60%**, allowing agents to process more data within their context window for less cost.

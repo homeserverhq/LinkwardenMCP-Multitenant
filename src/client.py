@@ -133,7 +133,7 @@ class LinkwardenServiceClient:
     async def get_link_by_id(self, link_id: int, api_key: Optional[str] = None) -> Any:
         return await self.get(f"/api/v1/links/{link_id}", api_key)
 
-    async def create_link(self, url: str, name: str, description: str, type: str, collectionId: int, tags: List[str], api_key: Optional[str] = None) -> Any:
+    async def create_link(self, url: str, name: str, description: str, collectionId: int, tags: List[str], api_key: Optional[str] = None) -> Any:
         # First, fetch the collection to get its name to satisfy the backend schema
         collection = await self.get_collection_by_id(collectionId, api_key)
         collection_name = collection.get("name", "Unknown Collection")
@@ -141,7 +141,7 @@ class LinkwardenServiceClient:
             "url": url,
             "name": name,
             "description": description,
-            "type": type,
+            "type": "url",
             "collection": {
                 "id": collectionId,
                 "name": collection_name

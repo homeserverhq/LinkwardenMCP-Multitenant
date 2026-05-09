@@ -61,7 +61,6 @@ class CreateLinkParam(BaseModel):
     url: str = Field(description="The URL of the bookmark")
     name: str = Field(description="The title of the bookmark")
     description: str = Field(description="A brief description of the bookmark")
-    type: str = Field(description="Type of link (e.g., 'url')")
     collectionId: int = Field(description="The ID of the collection to add it to")
     tags: list[str] = Field(default_factory=list, description="List of tag names to associate with the link")
     
@@ -165,7 +164,7 @@ async def get_link_by_id(params: GetLinkByIdParam, ctx: Context) -> dict[str, An
 async def create_link(params: CreateLinkParam, ctx: Context) -> dict[str, Any]:
     """Add a new bookmark."""
     return await get_client().create_link(
-        params.url, params.name, params.description, params.type, params.collectionId, params.tags, get_user_token()
+        params.url, params.name, params.description, params.collectionId, params.tags, get_user_token()
     )
 
 @mcp.tool()
